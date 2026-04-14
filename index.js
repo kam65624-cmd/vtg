@@ -3,9 +3,6 @@ const { Telegraf, Markup, session } = require('telegraf');
 const OpenAI = require('openai');
 const mongoose = require('mongoose');
 
-// ============================================================
-// --- CONFIGURATION ---
-// ============================================================
 const BOT_TOKEN    = process.env.BOT_TOKEN;
 const GROQ_KEY     = process.env.GROQ_API_KEY;
 const MONGO_URI    = process.env.MONGODB_URI;
@@ -18,17 +15,12 @@ if (!BOT_TOKEN || !GROQ_KEY) {
 
 const bot = new Telegraf(BOT_TOKEN);
 
-// Initialize OpenAI client pointing to Groq Cloud
 const client = new OpenAI({
   apiKey: GROQ_KEY,
   baseURL: 'https://api.groq.com/openai/v1' 
 });
 
-// ============================================================
-// --- AI CORE (Groq Llama 3) ---
-// ============================================================
 async function askAI(prompt) {
-  // We use Llama 3.3 70B for high quality and speed
   const models = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"];
   
   for (const modelName of models) {
@@ -46,9 +38,6 @@ async function askAI(prompt) {
   return "❌ فشل الاتصال بالذكاء الاصطناعي المجاني.\n\nيرجى المحاولة لاحقاً أو التأكد من سلامة مفتاح Groq.";
 }
 
-// ============================================================
-// --- UI & LOGIC ---
-// ============================================================
 const mainMenu = (ctx) => {
   const buttons = [
     [Markup.button.callback('📊 إنشاء إشارة تداول', 'cmd_new_signal')],
@@ -63,7 +52,8 @@ const mainMenu = (ctx) => {
 };
 
 bot.use(session());
-bot.use(async (ctx, next) => {
+
+bot.on('message', async (ctx, next) => {
   if (ctx.from) console.log(`[LOG] ${ctx.from.id}: ${ctx.message?.text || ctx.callbackQuery?.data}`);
   await next();
 });
@@ -94,7 +84,7 @@ bot.on('text', async (ctx) => {
   if (session.awaitingType === 'ai_rewrite' || session.awaitingType === 'ai_ask') {
     const thinking = await ctx.reply('⏳ جاري المعالجة بذكاء Llama 3...');
     const result = await askAI(text);
-    await ctx.telegram.deleteMessage(ctx.chat.id, thinking.message_id).catch(() => {});
+    try { await ctx.telegram.deleteMessage(ctx.chat.id, thinking.message_id); } catch(e) {}
     ctx.reply(result, { parse_mode: 'Markdown' });
     ctx.session = {};
     return;
@@ -103,17 +93,24 @@ bot.on('text', async (ctx) => {
   if (!text.startsWith('/')) {
     const thinking = await ctx.reply('💡 ثوانٍ...');
     const result = await askAI(text);
-    await ctx.telegram.deleteMessage(ctx.chat.id, thinking.message_id).catch(() => {});
+    try { await ctx.telegram.deleteMessage(ctx.chat.id, thinking.message_id); } catch(e) {}
     ctx.reply(result, { parse_mode: 'Markdown' });
   }
 });
 
-// --- LAUNCH ---
 (async () => {
   try {
-    if (MONGO_URI && !MONGO_URI.includes('your_mongodb')) await mongoose.connect(MONGO_URI);
-  } catch (err) {}
-  bot.launch().then(() => console.log('🚀 Bot is LIVE with Groq (Llama 3) AI!'));
+    if (MONGO_URI && !MONGO_URI.includes('your_mongodb')) {
+      await mongoose.connect(MONGO_URI);
+      console.log('✅ MongoDB Connected');
+    }
+  } catch (err) {
+    console.log('⚠️ MongoDB not connected, using memory session');
+  }
+  
+  console.log('🚀 Bot starting...');
+  await bot.launch();
+  console.log('✅ Bot is LIVE!');
 })();
 
 process.once('SIGINT',  () => bot.stop('SIGINT'));
