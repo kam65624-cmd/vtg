@@ -8,6 +8,10 @@ const GROQ_KEY     = process.env.GROQ_API_KEY;
 const MONGO_URI    = process.env.MONGODB_URI;
 const ADMIN_IDS    = (process.env.ADMIN_IDS || '').split(',').map(id => parseInt(id)).filter(Boolean);
 
+console.log('BOT_TOKEN:', BOT_TOKEN ? 'set' : 'missing');
+console.log('GROQ_API_KEY:', GROQ_KEY ? 'set' : 'missing');
+console.log('MONGO_URI:', MONGO_URI ? 'set' : 'missing');
+
 if (!BOT_TOKEN || !GROQ_KEY) {
   console.error('Missing BOT_TOKEN or GROQ_API_KEY');
   process.exit(1);
